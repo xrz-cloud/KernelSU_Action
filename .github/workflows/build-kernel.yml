@@ -1,15 +1,13 @@
 name: Build Kernel
 on:
-  watch:
-    types: [started]
-
+  schedule:
+    - cron: '0 11 * * 0,2,4,6'
   workflow_dispatch:
 
 jobs:
   build:
     name: Build Kernel by ${{ github.actor }}
     runs-on: ubuntu-latest
-    if: github.event.repository.owner.id == github.event.sender.id
     env:
       CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
       CCACHE_NOHASHDIR: "true"
@@ -206,7 +204,7 @@ jobs:
       run: |
         cd $GITHUB_WORKSPACE/kernel_workspace/android-kernel
         export PATH=$GITHUB_WORKSPACE/kernel_workspace/clang-aosp/bin:$PATH
-        export KBUILD_BUILD_HOST=Github-Action
+        export KBUILD_BUILD_HOST=xrz-Github-Action
         export KBUILD_BUILD_USER=$(echo ${{ github.actor }} | tr A-Z a-z)
         if [ ! -z ${{ env.KSU_EXPECTED_SIZE }} ] && [ ! -z ${{ env.KSU_EXPECTED_HASH }} ]; then
           export KSU_EXPECTED_SIZE=${{ env.KSU_EXPECTED_SIZE }}
@@ -248,6 +246,8 @@ jobs:
         cp android-kernel/out/arch/${{ env.ARCH }}/boot/${{ env.KERNEL_IMAGE_NAME }} AnyKernel3/
         if [ ${{ env.CHECK_DTBO_IS_OK }} = true ]; then
             cp android-kernel/out/arch/${{ env.ARCH }}/boot/dtbo.img AnyKernel3/
+            find android-kernel/out/arch/${{ env.ARCH }}/boot/dts/vendor/qcom -name '*.dtb' -exec cat {} + > android-kernel/out/arch/${{ env.ARCH }}/boot/dtb
+            cp android-kernel/out/arch/${{ env.ARCH }}/boot/dtb AnyKernel3/
         fi
         rm -rf AnyKernel3/.git* AnyKernel3/README.md
 
@@ -285,6 +285,13 @@ jobs:
       with:
         name: dtbo-${{ env.DEVICE }}-${{ env.BUILD_TIME }}
         path: kernel_workspace/android-kernel/out/arch/${{ env.ARCH }}/boot/dtbo.img
+
+    - name: Upload DTB File
+      if: env.CHECK_DTBO_IS_OK == 'true'
+      uses: actions/upload-artifact@v3
+      with:
+        name: dtb-${{ env.DEVICE }}-${{ env.BUILD_TIME }}
+        path: kernel_workspace/android-kernel/out/arch/${{ env.ARCH }}/boot/dtb
 
     - name: Upload boot image
       if: env.MAKE_BOOT_IMAGE_IS_OK == 'true'
